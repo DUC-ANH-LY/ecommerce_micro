@@ -3,7 +3,7 @@ package com.ecommerce.product_service.controller;
 import com.ecommerce.product_service.entity.Product;
 import com.ecommerce.product_service.service.ProductService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,14 +17,14 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping
-    public Page<Product> getProducts(
+    public Slice<Product> getProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return productService.getProducts(page, size);
     }
 
     @GetMapping("/search")
-    public Page<Product> searchProducts(
+    public Slice<Product> searchProducts(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
