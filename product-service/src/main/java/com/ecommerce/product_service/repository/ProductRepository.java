@@ -9,10 +9,10 @@ import org.springframework.data.domain.Pageable;
 import java.util.Collection;
 import com.ecommerce.product_service.entity.Category;
 
-import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Page;
 
 @Repository
 public interface ProductRepository extends MongoRepository<Product, String> {
-    Slice<Product> findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(String name, String description, Pageable pageable);
-    Slice<Product> findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrCategoriesIn(String name, String description, Collection<Category> categories, Pageable pageable);
+    Page<Product> findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(String name, String description, Pageable pageable);
+    Page<Product> findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrCategoriesIn(String name, String description, Collection<Category> categories, Pageable pageable);
 }

@@ -57,7 +57,21 @@ services:
           cpus: '0.5'
           memory: 1G
 
+  # Redis Cache
+  redis:
+    image: redis:7.0-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
 volumes:
   configsvr_data:
   shard1_data:
   shard2_data:
+  redis_data:

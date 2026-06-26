@@ -4,6 +4,11 @@ spring:
   data:
     mongodb:
       uri: mongodb://localhost:27017/product_db
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
 
 server:
   port: 8080
