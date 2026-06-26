@@ -73,4 +73,29 @@ Because of this simple code change, MongoDB will now stop scanning the moment it
 
 Go ahead and restart your Spring Boot application in your IDE and run your wrk test again! You should see the timeouts completely disappear, and your Requests/sec should skyrocket.
 
+How Page<Product> works:
+When your app uses Page, it has to give the frontend two things: the 20 items, AND the Total Number of Pages. To get the total pages, Spring Boot sends two queries to MongoDB:
+
+"Find the first 20 products containing '118'." (This is fast).
+"Now, keep scanning the database and count every single product that contains '118' so I can do math." (This is incredibly slow!).
+MongoDB is forced to scan all 1,000,000 records just to make sure it didn't miss a single match for the .count() query. Under heavy load, this crashes your database.
+
+How Slice<Product> works:
+When your app uses Slice, it only needs to give the frontend the 20 items, and a simple hasNext: true/false boolean so the frontend knows whether to display a "Next Page" button. It doesn't care about the total number of pages.
+
+To figure this out, Spring Boot does a clever trick. It sends a single query to MongoDB:
+
+"Find the first 21 products containing '118' and then immediately stop looking."
+If MongoDB returns exactly 21 items, Spring Boot throws the 21st item in the trash, returns the 20 items to the user, and sets hasNext = true (because the 21st item proved there is more data).
+If MongoDB returns 20 items or less, Spring Boot sets hasNext = false (because it couldn't find a 21st item).
+The Performance Difference
+With Slice, MongoDB stops working the exact millisecond it finds 21 matches. It doesn't matter if there are 500,000 other matches sitting in the database—it doesn't look for them, and it doesn't count them.
+
+By eliminating the need to count the remaining 999,979 rows, your query goes from taking 60 seconds down to a few milliseconds!
+
+12:35 AM
+
+- how sharding works with search
+Your search API triggers the Scatter-Gather pattern. Even though mongos has to ask both shards, performance is significantly improved because the heavy lifting of actually scanning the database is split in half (each shard only has to scan 500k records instead of 1 million). And because they scan at the exact same time in parallel, you get the results much faster!
 ![alt text](image-2.png)
+
