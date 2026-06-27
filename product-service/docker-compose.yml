@@ -1,63 +1,16 @@
 services:
-  # Config Server
-  configsvr:
+  mongodb:
     image: mongo:6.0
-    command: mongod --configsvr --replSet configRS --bind_ip_all --port 27019
-    ports:
-      - "27019:27019"
-    volumes:
-      - configsvr_data:/data/configdb
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 1G
-
-  # Shard 1
-  shard1:
-    image: mongo:6.0
-    command: mongod --shardsvr --replSet shard1RS --bind_ip_all --port 27018
-    ports:
-      - "27018:27018"
-    volumes:
-      - shard1_data:/data/db
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 2G
-
-  # Shard 2
-  shard2:
-    image: mongo:6.0
-    command: mongod --shardsvr --replSet shard2RS --bind_ip_all --port 27018
-    ports:
-      - "27020:27018"
-    volumes:
-      - shard2_data:/data/db
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 2G
-
-  # Mongos Router
-  mongos:
-    image: mongo:6.0
-    command: mongos --configdb configRS/configsvr:27019 --bind_ip_all --port 27017
     ports:
       - "27017:27017"
-    depends_on:
-      - configsvr
-      - shard1
-      - shard2
+    volumes:
+      - mongo_data:/data/db
+    # Optional: You can remove these limits if you want Mongo to use all available CPU
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 1G
+          cpus: '3'
+          memory: 6G
 
 volumes:
-  configsvr_data:
-  shard1_data:
-  shard2_data:
+  mongo_data:
