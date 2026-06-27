@@ -11,9 +11,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
+import com.ecommerce.product_service.dto.request.ProductRequest;
 
 import java.util.List;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 @Service
@@ -75,5 +78,74 @@ public class ProductServiceImpl implements ProductService {
             page++;
             System.out.println("Synced page " + page + " to Elasticsearch");
         } while (productPage.hasNext());
+    }
+
+    @Override
+    @CacheEvict(value = {"products", "productSearch"}, allEntries = true)
+    public Product createProduct(ProductRequest request) {
+        Set<Category> categories = new HashSet<>();
+        if (request.getCategoryIds() != null && !request.getCategoryIds().isEmpty()) {
+            categories = new HashSet<>(categoryRepository.findAllById(request.getCategoryIds()));
+        }
+
+        Product product = Product.builder()
+                .name(request.getName())
+                .description(request.getDescription())
+                .price(request.getPrice())
+                .stock(request.getStock())
+                .categories(categories)
+                .build();
+
+        product = productRepository.save(product);
+        syncSingleProductToElasticsearch(product);
+        return product;
+    }
+
+    @Override
+    public Product getProductById(String id) {
+        return productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
+    }
+
+    @Override
+    @CacheEvict(value = {"products", "productSearch"}, allEntries = true)
+    public Product updateProduct(String id, ProductRequest request) {
+        Product existing = getProductById(id);
+        
+        Set<Category> categories = existing.getCategories();
+        if (request.getCategoryIds() != null) {
+            categories = new HashSet<>(categoryRepository.findAllById(request.getCategoryIds()));
+        }
+
+        existing.setName(request.getName());
+        existing.setDescription(request.getDescription());
+        existing.setPrice(request.getPrice());
+        existing.setStock(request.getStock());
+        existing.setCategories(categories);
+
+        existing = productRepository.save(existing);
+        syncSingleProductToElasticsearch(existing);
+        return existing;
+    }
+
+    @Override
+    @CacheEvict(value = {"products", "productSearch"}, allEntries = true)
+    public void deleteProduct(String id) {
+        productRepository.deleteById(id);
+        productSearchRepository.deleteById(id);
+    }
+
+    private void syncSingleProductToElasticsearch(Product p) {
+        Set<String> catNames = p.getCategories() != null ? 
+            p.getCategories().stream().map(Category::getName).collect(Collectors.toSet()) : null;
+        com.ecommerce.product_service.document.ProductDocument doc = com.ecommerce.product_service.document.ProductDocument.builder()
+                .id(p.getId())
+                .name(p.getName())
+                .description(p.getDescription())
+                .price(p.getPrice())
+                .stock(p.getStock())
+                .categories(catNames)
+                .build();
+        productSearchRepository.save(doc);
     }
 }
