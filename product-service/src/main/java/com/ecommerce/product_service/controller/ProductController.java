@@ -30,4 +30,11 @@ public class ProductController {
             @RequestParam(defaultValue = "20") int size) {
         return productService.searchProducts(keyword, page, size);
     }
+
+    @org.springframework.web.bind.annotation.PostMapping("/sync")
+    public String syncData() {
+        // Run in background so request doesn't timeout
+        new Thread(productService::syncToElasticsearch).start();
+        return "Sync started in the background!";
+    }
 }

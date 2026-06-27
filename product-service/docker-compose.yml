@@ -70,8 +70,26 @@ services:
           cpus: '0.5'
           memory: 512M
 
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+          memory: 6G
+
 volumes:
   configsvr_data:
   shard1_data:
   shard2_data:
   redis_data:
+  elasticsearch_data:
