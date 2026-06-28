@@ -10,4 +10,5 @@ public interface CategoryService {
     List<Category> getAllCategories();
     Category updateCategory(String id, CategoryRequest categoryRequest);
     void deleteCategory(String id);
+    void syncToElasticsearch();
 }

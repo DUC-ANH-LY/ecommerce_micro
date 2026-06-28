@@ -18,6 +18,15 @@ import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Collections;
+
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+import org.springframework.data.elasticsearch.core.query.Query;
+import org.springframework.data.elasticsearch.core.query.StringQuery;
+import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.SearchHit;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +36,7 @@ public class ProductServiceImpl implements ProductService {
     private final CategoryRepository categoryRepository;
 
     private final ProductSearchRepository productSearchRepository;
+    private final ElasticsearchOperations elasticsearchOperations;
 
     @Cacheable(value = "products", key = "#page + '-' + #size")
     public Page<Product> getProducts(int page, int size) {
@@ -35,24 +45,64 @@ public class ProductServiceImpl implements ProductService {
 
     // @Cacheable(value = "productSearch", key = "#keyword + '-' + #page + '-' + #size")
     public Page<Product> searchProducts(String keyword, int page, int size) {
-        // 1. Search in Elasticsearch
-        Page<com.ecommerce.product_service.document.ProductDocument> documentPage = 
-            productSearchRepository.searchByKeyword(keyword, PageRequest.of(page, size));
-            
-        // 2. Extract IDs
-        List<String> ids = documentPage.getContent().stream()
-                .map(com.ecommerce.product_service.document.ProductDocument::getId)
-                .toList();
-                
-        if (ids.isEmpty()) {
+        String queryString = "{\"query_string\": {\"query\": \"*" + keyword + "* OR " + keyword + "~\", \"fields\": [\"name\", \"description\", \"categories\"], \"lenient\": true}}";
+        Query query = new StringQuery(queryString);
+        query.setPageable(PageRequest.of(page, size));
+
+        SearchHits<Object> searchHits = elasticsearchOperations.search(
+                query,
+                Object.class,
+                IndexCoordinates.of("products", "categories")
+        );
+
+        List<String> productIds = new ArrayList<>();
+        List<String> categoryIds = new ArrayList<>();
+        java.util.Map<String, Float> scoreMap = new java.util.HashMap<>();
+
+        for (SearchHit<Object> hit : searchHits) {
+            scoreMap.put(hit.getId(), hit.getScore());
+            if ("products".equals(hit.getIndex())) {
+                productIds.add(hit.getId());
+            } else if ("categories".equals(hit.getIndex())) {
+                categoryIds.add(hit.getId());
+            }
+        }
+
+        if (productIds.isEmpty() && categoryIds.isEmpty()) {
             return Page.empty(PageRequest.of(page, size));
         }
-        
-        // 3. Fetch from MongoDB to get full Product entities (including lazy Categories)
-        List<Product> products = (List<Product>) productRepository.findAllById(ids);
-        
-        // Return as Page
-        return new org.springframework.data.domain.PageImpl<>(products, PageRequest.of(page, size), documentPage.getTotalElements());
+
+        List<Category> matchedCategories = Collections.emptyList();
+        if (!categoryIds.isEmpty()) {
+            matchedCategories = categoryRepository.findAllById(categoryIds);
+        }
+
+        List<Product> products = productRepository.findByIdInOrCategoriesIn(productIds, matchedCategories);
+
+        // Sort products by Elasticsearch relevance score (Descending)
+        products.sort((p1, p2) -> {
+            float score1 = scoreMap.getOrDefault(p1.getId(), 0f);
+            if (p1.getCategories() != null) {
+                for (Category c : p1.getCategories()) {
+                    score1 = Math.max(score1, scoreMap.getOrDefault(c.getId(), 0f));
+                }
+            }
+            float score2 = scoreMap.getOrDefault(p2.getId(), 0f);
+            if (p2.getCategories() != null) {
+                for (Category c : p2.getCategories()) {
+                    score2 = Math.max(score2, scoreMap.getOrDefault(c.getId(), 0f));
+                }
+            }
+            return Float.compare(score2, score1);
+        });
+
+        // Simple manual pagination for the resulting products (since they are fetched combined)
+        int start = (int) PageRequest.of(page, size).getOffset();
+        int end = Math.min((start + size), products.size());
+        List<Product> pagedProducts = products.isEmpty() || start >= products.size() ? 
+                Collections.emptyList() : products.subList(start, end);
+
+        return new org.springframework.data.domain.PageImpl<>(pagedProducts, PageRequest.of(page, size), products.size());
     }
 
     @Override
