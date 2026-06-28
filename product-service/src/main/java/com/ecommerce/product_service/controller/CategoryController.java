@@ -47,4 +47,11 @@ public class CategoryController {
     public void deleteCategory(@PathVariable String id) {
         categoryService.deleteCategory(id);
     }
+
+    @PostMapping("/sync")
+    @Operation(summary = "Sync categories to Elasticsearch", description = "Synchronizes all categories from MongoDB to Elasticsearch")
+    public String syncCategories() {
+        categoryService.syncToElasticsearch();
+        return "Category sync to Elasticsearch initiated/completed successfully.";
+    }
 }
